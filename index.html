@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAS 101 — Exam 1</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --fg:#1d1d1f;
+      --muted:#6e6e73;
+      --track:#ececef;
+      --green:#00d66b;
+      --button:#1d1d1f;
+      --button-border:#e5e5e7;
+    }
+
+    *{box-sizing:border-box}
+
+    html,body{
+      margin:0;
+      min-height:100%;
+      background:var(--bg);
+      color:var(--fg);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    }
+
+    body{
+      min-height:100vh;
+      overflow:hidden;
+    }
+
+    .screen{
+      min-height:100vh;
+      display:grid;
+      grid-template-rows:auto 1fr;
+      padding:34px 44px 32px;
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size:14px;
+    }
+
+    .spacer{
+      width:80px;
+      height:1px;
+    }
+
+    .clock{
+      color:var(--muted);
+      font-variant-numeric:tabular-nums;
+    }
+
+    .stage{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:12px 20px 20px;
+    }
+
+    .wrap{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:26px;
+      width:100%;
+    }
+
+    .ring{
+      position:relative;
+      width:min(74vh, 690px);
+      aspect-ratio:1;
+      max-width:86vw;
+    }
+
+    .ring svg{
+      width:100%;
+      height:100%;
+      display:block;
+      transform:rotate(-90deg);
+      overflow:visible;
+    }
+
+    .track,
+    .progress{
+      fill:none;
+      stroke-width:8;
+    }
+
+    .track{
+      stroke:var(--track);
+    }
+
+    .progress{
+      stroke:var(--green);
+      stroke-linecap:round;
+      transition:stroke-dashoffset 1s linear;
+    }
+
+    .inside{
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:19%;
+    }
+
+    .inside .eyebrow{
+      margin-bottom:12px;
+      font-size:clamp(18px, 2vw, 28px);
+      color:var(--muted);
+      font-weight:600;
+      letter-spacing:-.015em;
+      min-height:1.2em;
+    }
+
+    .inside h1{
+      margin:0;
+      font-size:clamp(64px, 8vw, 118px);
+      line-height:.93;
+      letter-spacing:-.06em;
+      font-weight:700;
+    }
+
+    .inside .chapters{
+      margin-top:18px;
+      font-size:clamp(22px, 2.2vw, 34px);
+      line-height:1.15;
+      font-weight:600;
+      letter-spacing:-.025em;
+    }
+
+    .status{
+      min-height:34px;
+      font-size:clamp(18px, 1.7vw, 23px);
+      color:var(--muted);
+      font-weight:500;
+    }
+
+    .status:empty{
+      visibility:hidden;
+    }
+
+    .controls{
+      display:flex;
+      gap:10px;
+      transition:opacity .2s ease;
+    }
+
+    button{
+      appearance:none;
+      border:1px solid var(--button-border);
+      background:#fff;
+      color:var(--fg);
+      font:inherit;
+      font-size:14px;
+      padding:10px 16px;
+      border-radius:999px;
+      cursor:pointer;
+    }
+
+    .primary{
+      background:var(--button);
+      color:#fff;
+      border-color:var(--button);
+    }
+
+    .exam-running .controls{
+      opacity:.08;
+    }
+
+    .exam-running .controls:hover{
+      opacity:1;
+    }
+
+    .time-up .inside .eyebrow{
+      display:none;
+    }
+
+    .time-up .inside h1{
+      font-size:clamp(56px, 6vw, 90px);
+    }
+
+    .time-up .inside .chapters{
+      margin-top:16px;
+      color:var(--muted);
+    }
+
+    @media(max-width:700px){
+      .screen{padding:24px 20px}
+      .ring{width:min(86vw, 560px)}
+      .track,.progress{stroke-width:7}
+      .inside{padding:17%}
+      .spacer{width:56px}
+    }
+  </style>
+</head>
+<body>
+  <main class="screen" id="screen">
+    <header class="topbar">
+      <div class="spacer" aria-hidden="true"></div>
+      <div class="clock" id="clock">—</div>
+    </header>
+
+    <section class="stage">
+      <div class="wrap">
+        <div class="ring" aria-label="Exam progress">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="track" cx="60" cy="60" r="50"></circle>
+            <circle class="progress" id="progressCircle" cx="60" cy="60" r="50"></circle>
+          </svg>
+
+          <div class="inside">
+            <div class="eyebrow" id="eyebrow">CAS 101</div>
+            <h1 id="mainText">Exam 1</h1>
+            <div class="chapters" id="chapters">Chapters 1–3</div>
+          </div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="controls">
+          <button class="primary" id="startBtn">Start exam</button>
+          <button id="pauseBtn" hidden>Pause</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const TOTAL_SECONDS = 75 * 60;
+    const MIDPOINT = TOTAL_SECONDS / 2;
+
+    const screen = document.getElementById('screen');
+    const clockEl = document.getElementById('clock');
+    const progressCircle = document.getElementById('progressCircle');
+    const statusEl = document.getElementById('status');
+    const eyebrowEl = document.getElementById('eyebrow');
+    const mainTextEl = document.getElementById('mainText');
+    const chaptersEl = document.getElementById('chapters');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const radius = 50;
+    const circumference = 2 * Math.PI * radius;
+    progressCircle.style.strokeDasharray = circumference;
+    progressCircle.style.strokeDashoffset = circumference;
+
+    let remaining = TOTAL_SECONDS;
+    let started = false;
+    let running = false;
+    let interval = null;
+
+    function updateClock(){
+      const now = new Date();
+      clockEl.textContent = now.toLocaleTimeString([], {
+        hour:'numeric',
+        minute:'2-digit'
+      });
+    }
+
+    function updateProgress(){
+      const elapsed = TOTAL_SECONDS - remaining;
+      const fraction = Math.max(0, Math.min(1, elapsed / TOTAL_SECONDS));
+      progressCircle.style.strokeDashoffset = circumference * (1 - fraction);
+    }
+
+    function updateStatus(){
+      if(!started){
+        statusEl.textContent = '';
+        return;
+      }
+
+      if(remaining <= 0){
+        statusEl.textContent = '';
+        return;
+      }
+
+      if(remaining <= 10 * 60){
+        statusEl.textContent = 'Final 10 minutes';
+        return;
+      }
+
+      if(remaining <= MIDPOINT && remaining > MIDPOINT - (5 * 60)){
+        statusEl.textContent = 'About halfway';
+        return;
+      }
+
+      statusEl.textContent = '';
+    }
+
+    function render(){
+      updateProgress();
+      updateStatus();
+      if(remaining <= 0) finishExam();
+    }
+
+    function tick(){
+      if(remaining > 0){
+        remaining -= 1;
+        render();
+      }
+    }
+
+    function startExam(){
+      if(running) return;
+      started = true;
+      running = true;
+
+      screen.classList.add('exam-running');
+      screen.classList.remove('time-up');
+      startBtn.hidden = true;
+      pauseBtn.hidden = false;
+      pauseBtn.textContent = 'Pause';
+
+      render();
+      interval = setInterval(tick, 1000);
+    }
+
+    function pauseExam(){
+      if(!started) return;
+
+      if(running){
+        running = false;
+        clearInterval(interval);
+        interval = null;
+        pauseBtn.textContent = 'Resume';
+        statusEl.textContent = 'Paused';
+        screen.classList.remove('exam-running');
+      } else {
+        running = true;
+        pauseBtn.textContent = 'Pause';
+        screen.classList.add('exam-running');
+        render();
+        interval = setInterval(tick, 1000);
+      }
+    }
+
+    function resetExam(){
+      clearInterval(interval);
+      interval = null;
+      remaining = TOTAL_SECONDS;
+      started = false;
+      running = false;
+
+      screen.classList.remove('exam-running','time-up');
+      eyebrowEl.textContent = 'CAS 101';
+      mainTextEl.textContent = 'Exam 1';
+      chaptersEl.textContent = 'Chapters 1–3';
+      statusEl.textContent = '';
+      progressCircle.style.strokeDashoffset = circumference;
+
+      startBtn.hidden = false;
+      pauseBtn.hidden = true;
+      pauseBtn.textContent = 'Pause';
+    }
+
+    function finishExam(){
+      clearInterval(interval);
+      interval = null;
+      remaining = 0;
+      running = false;
+
+      screen.classList.remove('exam-running');
+      screen.classList.add('time-up');
+      progressCircle.style.strokeDashoffset = 0;
+
+      eyebrowEl.textContent = '';
+      mainTextEl.textContent = 'Time';
+      chaptersEl.textContent = 'Please submit your exam.';
+      statusEl.textContent = '';
+
+      startBtn.hidden = true;
+      pauseBtn.hidden = true;
+    }
+
+    startBtn.addEventListener('click', startExam);
+    pauseBtn.addEventListener('click', pauseExam);
+    resetBtn.addEventListener('click', resetExam);
+
+    document.addEventListener('keydown', e => {
+      if(e.code === 'Space' && e.target.tagName !== 'BUTTON'){
+        e.preventDefault();
+        if(!started) startExam();
+        else pauseExam();
+      }
+      if(e.shiftKey && e.key.toLowerCase() === 'r') resetExam();
+    });
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    render();
+  </script>
+</body>
+</html>
